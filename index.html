@@ -56,7 +56,7 @@
   <span class="sub" id="sub">loading…</span>
 </header>
 <div id="wrap">
-  <div class="hint">↑ later fixtures · scroll down for past results ↓</div>
+  <div class="hint">↑ past results · scroll down for upcoming fixtures ↓</div>
   <div id="list"></div>
 </div>
 <button id="jump">Today</button>
@@ -80,8 +80,8 @@ function goalLine(g){
 
 function render(data){
   const matches = (data.matches||[]).filter(m=>m.date);
-  // Descending: future at top, past at bottom.
-  matches.sort((a,b)=> (b.date+(b.time||"")).localeCompare(a.date+(a.time||"")) );
+  // Ascending: past at top, future at bottom.
+  matches.sort((a,b)=> (a.date+(a.time||"")).localeCompare(b.date+(b.time||"")) );
 
   let html = "", lastDay = null, todayEl = null, firstFutureKey = null;
   // pick anchor: today's matches if any, else nearest upcoming, else nearest past
@@ -125,9 +125,9 @@ function render(data){
   // Anchor scroll
   let anchor = document.getElementById("__today");
   if(!anchor){
-    // nearest upcoming (smallest date >= today) — they're descending so last upcoming in DOM
+    // nearest upcoming (smallest date >= today) — ascending so first upcoming in DOM
     const upcoming = [...document.querySelectorAll('.match')].filter(el=>el.dataset.date>=todayStr);
-    anchor = upcoming.length ? upcoming[upcoming.length-1] : document.querySelector('.match');
+    anchor = upcoming.length ? upcoming[0] : [...document.querySelectorAll('.match')].pop();
   }
   if(anchor){
     anchor.scrollIntoView({block:"start"});
