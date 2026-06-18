@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>World Cup 2026 — Fixtures &amp; Results</title>
+<style>
+  :root{
+    --bg:#0c1014; --card:#161c24; --card2:#1b2330; --line:#2a3340;
+    --txt:#e8edf2; --dim:#8b97a5; --accent:#22c55e; --today:#3b82f6;
+    --win:#22c55e; --live:#ef4444;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--txt);
+    font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  header{position:sticky;top:0;z-index:10;background:rgba(12,16,20,.92);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);
+    padding:12px 16px;display:flex;align-items:center;gap:10px}
+  header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.2px}
+  header .sub{font-size:12px;color:var(--dim);margin-left:auto}
+  #wrap{max-width:560px;margin:0 auto;padding:8px 12px 40vh}
+  .hint{text-align:center;color:var(--dim);font-size:12px;padding:10px 0}
+  .day{margin:18px 0 8px;font-size:13px;font-weight:600;color:var(--dim);
+    text-transform:uppercase;letter-spacing:.6px;display:flex;align-items:center;gap:8px}
+  .day::after{content:"";flex:1;height:1px;background:var(--line)}
+  .day.is-today{color:var(--today)}
+  .match{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:12px 14px;margin:8px 0}
+  .match.today{border-color:var(--today);box-shadow:0 0 0 1px var(--today) inset}
+  .meta{display:flex;gap:8px;font-size:11px;color:var(--dim);margin-bottom:8px;flex-wrap:wrap}
+  .meta .grp{color:var(--accent)}
+  .row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px}
+  .team{display:flex;align-items:center;gap:8px;padding:3px 0;font-weight:500}
+  .team.win{font-weight:700}
+  .team.win .nm::after{content:" ✓";color:var(--win);font-size:12px}
+  .sc{font-variant-numeric:tabular-nums;font-weight:700;font-size:18px;
+    min-width:26px;text-align:center}
+  .vs{color:var(--dim);font-size:12px;font-weight:500}
+  .upcoming .sc{font-size:13px;color:var(--dim);font-weight:600}
+  .goals{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);
+    font-size:12px;color:var(--dim);display:grid;grid-template-columns:1fr 1fr;gap:2px 12px}
+  .goals .g2{text-align:right}
+  .pill{font-size:10px;background:var(--card2);border:1px solid var(--line);
+    padding:1px 6px;border-radius:99px;color:var(--dim)}
+  .err{margin:30px auto;max-width:420px;background:#2a1416;border:1px solid #5a2a2e;
+    color:#ffd7d9;padding:14px 16px;border-radius:10px;font-size:14px}
+  .err a{color:#ffd7d9}
+  #jump{position:fixed;right:14px;bottom:14px;z-index:20;background:var(--today);
+    color:#fff;border:none;border-radius:99px;padding:10px 16px;font-size:13px;
+    font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4);display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏆 World Cup 2026</h1>
+  <span class="sub" id="sub">loading…</span>
+</header>
+<div id="wrap">
+  <div class="hint">↑ later fixtures · scroll down for past results ↓</div>
+  <div id="list"></div>
+</div>
+<button id="jump">Today</button>
+
+<script>
+const SRC = "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json";
+const list = document.getElementById("list");
+const sub  = document.getElementById("sub");
+const jump = document.getElementById("jump");
+
+const todayStr = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local
+
+function fmtDay(iso){
+  const d = new Date(iso + "T12:00:00");
+  return d.toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"});
+}
+function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function goalLine(g){
+  return esc(g.name) + " " + g.minute + "'" + (g.penalty?" (P)":"") + (g.owngoal?" (OG)":"");
+}
+
+function render(data){
+  const matches = (data.matches||[]).filter(m=>m.date);
+  // Descending: future at top, past at bottom.
+  matches.sort((a,b)=> (b.date+(b.time||"")).localeCompare(a.date+(a.time||"")) );
+
+  let html = "", lastDay = null, todayEl = null, firstFutureKey = null;
+  // pick anchor: today's matches if any, else nearest upcoming, else nearest past
+  const hasToday = matches.some(m=>m.date===todayStr);
+
+  matches.forEach((m,i)=>{
+    if(m.date !== lastDay){
+      lastDay = m.date;
+      const isToday = m.date===todayStr;
+      html += `<div class="day${isToday?' is-today':''}" data-day="${m.date}">`+
+              `${fmtDay(m.date)}${isToday?' · TODAY':''}</div>`;
+    }
+    const played = m.score && Array.isArray(m.score.ft);
+    const isToday = m.date===todayStr;
+    const f = played ? m.score.ft : null;
+    const w1 = played && f[0]>f[1], w2 = played && f[1]>f[0];
+    const goals = (played && ((m.goals1&&m.goals1.length)||(m.goals2&&m.goals2.length)));
+
+    html += `<div class="match${played?'':' upcoming'}${isToday?' today':''}" `+
+            `data-date="${m.date}" id="${isToday&&!todayEl?'__today':''}">`+
+      `<div class="meta">`+
+        (m.group?`<span class="grp">${esc(m.group)}</span>`:`<span class="grp">${esc(m.round||'')}</span>`)+
+        (m.time?`<span>${esc(m.time)}</span>`:'')+
+        (m.ground?`<span>📍 ${esc(m.ground)}</span>`:'')+
+        (!played?`<span class="pill">upcoming</span>`:'')+
+      `</div>`+
+      `<div class="row"><div class="team${w1?' win':''}"><span class="nm">${esc(m.team1)}</span></div>`+
+        `<div class="sc">${played?f[0]:''}</div></div>`+
+      `<div class="row"><div class="team${w2?' win':''}"><span class="nm">${esc(m.team2)}</span></div>`+
+        `<div class="sc">${played?f[1]:'<span class="vs">vs</span>'}</div></div>`+
+      (goals?`<div class="goals"><div>${(m.goals1||[]).map(goalLine).join('<br>')}</div>`+
+        `<div class="g2">${(m.goals2||[]).map(goalLine).join('<br>')}</div></div>`:'')+
+    `</div>`;
+    if(isToday && !todayEl) todayEl = true;
+  });
+
+  list.innerHTML = html;
+  const played = matches.filter(m=>m.score&&m.score.ft).length;
+  sub.textContent = `${matches.length} matches · ${played} played`;
+
+  // Anchor scroll
+  let anchor = document.getElementById("__today");
+  if(!anchor){
+    // nearest upcoming (smallest date >= today) — they're descending so last upcoming in DOM
+    const upcoming = [...document.querySelectorAll('.match')].filter(el=>el.dataset.date>=todayStr);
+    anchor = upcoming.length ? upcoming[upcoming.length-1] : document.querySelector('.match');
+  }
+  if(anchor){
+    anchor.scrollIntoView({block:"start"});
+    window.scrollBy(0,-64); // clear sticky header
+  }
+  // jump button
+  jump.style.display = "block";
+  jump.onclick = ()=>{ if(anchor){anchor.scrollIntoView({block:"start"});window.scrollBy(0,-64);} };
+}
+
+fetch(SRC,{cache:"no-store"})
+  .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+  .then(render)
+  .catch(e=>{
+    list.innerHTML = `<div class="err">Couldn't load the fixtures (${esc(e.message)}).<br><br>`+
+      `If you opened this file directly, the live JSON may be blocked. Try a quick local server, `+
+      `or open it from a hosted URL.<br><br>Source: <a href="${SRC}">${SRC}</a></div>`;
+    sub.textContent = "error";
+  });
+</script>
+</body>
+</html>
