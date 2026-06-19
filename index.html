@@ -77,11 +77,32 @@ function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":
 function goalLine(g){
   return esc(g.name) + " " + g.minute + "'" + (g.penalty?" (P)":"") + (g.owngoal?" (OG)":"");
 }
+// True UTC instant for a match, parsing "HH:MM UTC±N" offsets in the source data.
+function matchInstant(date, time){
+  const Y=+date.slice(0,4), Mo=+date.slice(5,7)-1, D=+date.slice(8,10);
+  const m = time && time.match(/^(\d{1,2}):(\d{2})\s*UTC\s*([+-]\d{1,2})(?::?(\d{2}))?/i);
+  if(!m) return Date.UTC(Y,Mo,D,12,0); // fallback: noon, for stable sorting only
+  const sign = m[3].trim()[0]==='-' ? -1 : 1;
+  const offMin = sign*(Math.abs(parseInt(m[3],10))*60 + (m[4]?+m[4]:0));
+  return Date.UTC(Y,Mo,D,+m[1],+m[2]) - offMin*60000;
+}
+// Convert a match time to UK local (Europe/London) with correct BST/GMT label + day-rollover flag.
+function ukTime(date, time){
+  if(!time) return null;
+  if(!/UTC\s*[+-]\d/i.test(time)) return {t:time, dd:0}; // unknown format: show as-is
+  const d = new Date(matchInstant(date,time));
+  const parts = new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/London",
+    hour:"2-digit",minute:"2-digit",hour12:false,timeZoneName:"short"}).formatToParts(d);
+  const get = t => (parts.find(p=>p.type===t)||{}).value||"";
+  const ukDate = d.toLocaleDateString("en-CA",{timeZone:"Europe/London"});
+  return {t:`${get("hour")}:${get("minute")} ${get("timeZoneName")}`,
+          dd: ukDate>date?1:(ukDate<date?-1:0)};
+}
 
 function render(data){
   const matches = (data.matches||[]).filter(m=>m.date);
-  // Ascending: past at top, future at bottom.
-  matches.sort((a,b)=> (a.date+(a.time||"")).localeCompare(b.date+(b.time||"")) );
+  // Ascending by true kickoff instant: past at top, future at bottom.
+  matches.sort((a,b)=> matchInstant(a.date,a.time) - matchInstant(b.date,b.time) );
 
   let html = "", lastDay = null, todayEl = null, firstFutureKey = null;
   // pick anchor: today's matches if any, else nearest upcoming, else nearest past
@@ -99,12 +120,13 @@ function render(data){
     const f = played ? m.score.ft : null;
     const w1 = played && f[0]>f[1], w2 = played && f[1]>f[0];
     const goals = (played && ((m.goals1&&m.goals1.length)||(m.goals2&&m.goals2.length)));
+    const uk = ukTime(m.date, m.time);
 
     html += `<div class="match${played?'':' upcoming'}${isToday?' today':''}" `+
             `data-date="${m.date}" id="${isToday&&!todayEl?'__today':''}">`+
       `<div class="meta">`+
         (m.group?`<span class="grp">${esc(m.group)}</span>`:`<span class="grp">${esc(m.round||'')}</span>`)+
-        (m.time?`<span>${esc(m.time)}</span>`:'')+
+        (uk?`<span>🕑 ${esc(uk.t)}${uk.dd>0?' <span class="vs">+1d</span>':uk.dd<0?' <span class="vs">−1d</span>':''}</span>`:'')+
         (m.ground?`<span>📍 ${esc(m.ground)}</span>`:'')+
         (!played?`<span class="pill">upcoming</span>`:'')+
       `</div>`+
