@@ -27,6 +27,16 @@
   .match{background:var(--card);border:1px solid var(--line);border-radius:12px;
     padding:12px 14px;margin:8px 0}
   .match.today{border-color:var(--today);box-shadow:0 0 0 1px var(--today) inset}
+  /* England: red & white, St George's cross vibe */
+  .match.eng{background:#fff;border:1px solid #c8102e;
+    box-shadow:0 0 0 1px #c8102e inset, 0 2px 12px rgba(200,16,46,.25)}
+  .match.eng .team,.match.eng .sc,.match.eng .nm{color:#11151a}
+  .match.eng .meta,.match.eng .vs,.match.eng .goals{color:#6b7178}
+  .match.eng .grp{color:#c8102e;font-weight:700}
+  .match.eng .pill{background:#fff;border-color:#c8102e;color:#c8102e}
+  .match.eng .goals{border-top-color:#f1c7cd}
+  .match.eng.today{box-shadow:0 0 0 2px #c8102e inset,0 2px 12px rgba(200,16,46,.3)}
+  .flag{font-size:14px;line-height:1}
   .meta{display:flex;gap:8px;font-size:11px;color:var(--dim);margin-bottom:8px;flex-wrap:wrap}
   .meta .grp{color:var(--accent)}
   .row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px}
@@ -121,8 +131,10 @@ function render(data){
     const w1 = played && f[0]>f[1], w2 = played && f[1]>f[0];
     const goals = (played && ((m.goals1&&m.goals1.length)||(m.goals2&&m.goals2.length)));
     const uk = ukTime(m.date, m.time);
+    const isEng = m.team1==='England' || m.team2==='England';
+    const flag = '<span class="flag">🏴󠁧󠁢󠁥󠁮󠁧󠁿</span> ';
 
-    html += `<div class="match${played?'':' upcoming'}${isToday?' today':''}" `+
+    html += `<div class="match${played?'':' upcoming'}${isToday?' today':''}${isEng?' eng':''}" `+
             `data-date="${m.date}" id="${isToday&&!todayEl?'__today':''}">`+
       `<div class="meta">`+
         (m.group?`<span class="grp">${esc(m.group)}</span>`:`<span class="grp">${esc(m.round||'')}</span>`)+
@@ -130,9 +142,9 @@ function render(data){
         (m.ground?`<span>📍 ${esc(m.ground)}</span>`:'')+
         (!played?`<span class="pill">upcoming</span>`:'')+
       `</div>`+
-      `<div class="row"><div class="team${w1?' win':''}"><span class="nm">${esc(m.team1)}</span></div>`+
+      `<div class="row"><div class="team${w1?' win':''}">${m.team1==='England'?flag:''}<span class="nm">${esc(m.team1)}</span></div>`+
         `<div class="sc">${played?f[0]:''}</div></div>`+
-      `<div class="row"><div class="team${w2?' win':''}"><span class="nm">${esc(m.team2)}</span></div>`+
+      `<div class="row"><div class="team${w2?' win':''}">${m.team2==='England'?flag:''}<span class="nm">${esc(m.team2)}</span></div>`+
         `<div class="sc">${played?f[1]:'<span class="vs">vs</span>'}</div></div>`+
       (goals?`<div class="goals"><div>${(m.goals1||[]).map(goalLine).join('<br>')}</div>`+
         `<div class="g2">${(m.goals2||[]).map(goalLine).join('<br>')}</div></div>`:'')+
